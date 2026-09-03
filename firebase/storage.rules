@@ -1,0 +1,10 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn(){ return request.auth != null; }
+    function officer(){ return signedIn() && get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'PROCUREMENT_OFFICER'; }
+    match /inspections/{inspectionId}/original/{fileName} { allow read,write: if officer() && resource == null && request.resource.size < 12 * 1024 * 1024 && request.resource.contentType.matches('image/.*'); }
+    match /inspections/{inspectionId}/processed/{fileName} { allow read,write: if officer() && request.resource.size < 12 * 1024 * 1024; }
+    match /reports/{fileName} { allow read,write: if signedIn() && request.resource.size < 10 * 1024 * 1024 && (request.resource.contentType == 'application/pdf'); }
+  }
+}

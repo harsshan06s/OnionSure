@@ -1,0 +1,1 @@
+/** @type {import('tailwindcss').Config} */ module.exports={content:['./index.html','./src/**/*.{ts,tsx}'],theme:{extend:{colors:{ink:'#16231b',leaf:'#163a24',mint:'#dcebdc',cream:'#f7f7f2',amber:'#c98224',danger:'#b7473e'}}},plugins:[]};

@@ -1,0 +1,1 @@
+{"indexes":[{"collectionGroup":"inspections","queryScope":"COLLECTION","fields":[{"fieldPath":"officerId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]}],"fieldOverrides":[]}

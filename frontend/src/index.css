@@ -1,0 +1,285 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #f1f5f9;
+    background-color: #080d0a;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    background: radial-gradient(circle at 50% 0%, #13241b 0%, #080d0a 70%);
+    color: #e2e8f0;
+  }
+
+  button, input, select {
+    font-family: inherit;
+  }
+}
+
+/* Glassmorphism & High-Tech Cards */
+.glass-card {
+  background: rgba(18, 29, 23, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(52, 211, 153, 0.15);
+  border-radius: 20px;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), 0 0 15px 0 rgba(16, 185, 129, 0.04);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card:hover {
+  border-color: rgba(52, 211, 153, 0.3);
+  box-shadow: 0 12px 35px -8px rgba(0, 0, 0, 0.6), 0 0 20px 0 rgba(16, 185, 129, 0.08);
+}
+
+.glass-card-amber {
+  background: rgba(30, 24, 15, 0.75);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 20px;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+}
+
+.glass-card-red {
+  background: rgba(35, 17, 19, 0.75);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 20px;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+}
+
+/* Interactive Buttons */
+.btn {
+  min-height: 42px;
+  border-radius: 12px;
+  padding: 8px 18px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  border: 1px solid rgba(110, 231, 183, 0.3);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+}
+
+.btn-secondary {
+  background: rgba(30, 48, 38, 0.6);
+  color: #d1fae5;
+  border: 1px solid rgba(52, 211, 153, 0.2);
+}
+
+.btn-secondary:hover {
+  background: rgba(38, 64, 50, 0.8);
+  border-color: rgba(52, 211, 153, 0.4);
+  color: #ffffff;
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border: 1px solid rgba(252, 165, 165, 0.3);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
+}
+
+.btn-outline {
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.btn-outline:hover {
+  border-color: rgba(52, 211, 153, 0.4);
+  color: #34d399;
+}
+
+/* Fields & Inputs */
+.field {
+  width: 100%;
+  min-height: 44px;
+  background: rgba(14, 23, 18, 0.9);
+  border: 1px solid rgba(52, 211, 153, 0.2);
+  border-radius: 12px;
+  padding: 10px 14px;
+  color: #f1f5f9;
+  font-size: 0.92rem;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.field:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  margin-bottom: 6px;
+}
+
+/* Badges & Status Chips */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.chip-good {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.3);
+}
+
+.chip-medium {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.chip-reject {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.chip-cyan {
+  background: rgba(6, 182, 212, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+/* Conveyor Belt Animation */
+@keyframes conveyorRoll {
+  0% {
+    background-position: 0px 0px;
+  }
+  100% {
+    background-position: 40px 0px;
+  }
+}
+
+.conveyor-belt-track {
+  background: repeating-linear-gradient(
+    90deg,
+    #1b2921 0px,
+    #1b2921 16px,
+    #24382e 16px,
+    #24382e 20px,
+    #141f18 20px,
+    #141f18 36px,
+    #2f483b 36px,
+    #2f483b 40px
+  );
+  background-size: 40px 100%;
+}
+
+.conveyor-belt-running {
+  animation: conveyorRoll 0.8s linear infinite;
+}
+
+.conveyor-belt-fast {
+  animation: conveyorRoll 0.4s linear infinite;
+}
+
+/* Scanner Beam Effect */
+@keyframes scanSweep {
+  0% {
+    top: 0%;
+    opacity: 0.2;
+  }
+  50% {
+    top: 90%;
+    opacity: 0.9;
+  }
+  100% {
+    top: 0%;
+    opacity: 0.2;
+  }
+}
+
+.laser-scanner-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent 0%, #06b6d4 25%, #38bdf8 50%, #06b6d4 75%, transparent 100%);
+  box-shadow: 0 0 12px #38bdf8, 0 0 24px #06b6d4;
+  animation: scanSweep 1.6s ease-in-out infinite;
+}
+
+/* Optical Strobe Flash */
+@keyframes strobeFlash {
+  0% { opacity: 0; }
+  15% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+
+.flash-trigger {
+  animation: strobeFlash 0.35s ease-out forwards;
+}
+
+/* Pulse Glows */
+@keyframes pulseGlowGreen {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.5);
+  }
+}
+
+.glow-good {
+  animation: pulseGlowGreen 2s infinite ease-in-out;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #080d0a;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e3327;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2a4736;
+}

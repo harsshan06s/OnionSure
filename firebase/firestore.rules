@@ -1,0 +1,16 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn(){ return request.auth != null; }
+    function userDoc(){ return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function admin(){ return signedIn() && userDoc().role == 'ADMIN' && userDoc().active == true; }
+    function officer(){ return signedIn() && userDoc().role == 'PROCUREMENT_OFFICER' && userDoc().active == true; }
+    match /users/{uid} { allow read: if signedIn() && (request.auth.uid==uid || admin()); allow create: if admin(); allow update: if admin() || (request.auth.uid==uid && request.resource.data.role==resource.data.role); allow delete: if admin(); }
+    match /procurement_centres/{id} { allow read: if signedIn(); allow write: if admin(); }
+    match /grading_rules/{id} { allow read: if signedIn(); allow write: if admin(); }
+    match /model_versions/{id} { allow read: if signedIn(); allow write: if admin(); }
+    match /inspections/{id} { allow create: if officer() && request.resource.data.officerId==request.auth.uid; allow read,update: if admin() || (officer() && resource.data.officerId==request.auth.uid); allow delete: if false; match /onions/{oid} { allow read,create,update: if admin() || (officer() && get(/databases/$(database)/documents/inspections/$(id)).data.officerId==request.auth.uid); allow delete: if false; } match /images/{iid} { allow read,create: if admin() || (officer() && get(/databases/$(database)/documents/inspections/$(id)).data.officerId==request.auth.uid); allow update,delete: if false; } }
+    match /quality_reports/{id} { allow read,create: if admin() || (officer() && request.resource.data.officerId==request.auth.uid); allow update,delete: if false; }
+    match /audit_logs/{id} { allow read: if admin() || (officer() && resource.data.userId==request.auth.uid); allow create: if signedIn() && request.resource.data.userId==request.auth.uid; allow update,delete: if false; }
+  }
+}
