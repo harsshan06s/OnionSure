@@ -15,7 +15,7 @@ import {
   ArrowRight,
   ShieldCheck
 } from 'lucide-react';
-import { Onion, OutputGrade, JudgePreset } from '../types';
+import { Onion, JudgePreset } from '../types';
 import { JUDGE_PRESETS, generateRandomSample } from '../services/demoData';
 import { soundFx } from '../services/audio';
 
@@ -31,9 +31,9 @@ interface ConveyorSimulatorProps {
 
 interface ConveyorItem {
   onion: Onion;
-  progress: number; // 0 to 100%
+  progress: number; // 0.0 to 100.0%
   id: number;
-  stage: 'APPROACHING' | 'INSPECTION' | 'DIVERTING' | 'DROPPED';
+  stage: 'APPROACHING' | 'INSPECTION' | 'DIVERTING';
   inspected: boolean;
   sorted: boolean;
   rotation: number;
@@ -51,7 +51,7 @@ export const ConveyorSimulator: React.FC<ConveyorSimulatorProps> = ({
   // Conveyor engine states
   const [isRunning, setIsRunning] = useState<boolean>(true);
   const [conveyorSpeed, setConveyorSpeed] = useState<number>(1.2);
-  const [items, setItems] = useState<ConveyorItem[]>([]);
+  const [renderItems, setRenderItems] = useState<ConveyorItem[]>([]);
   const [inspectedOnion, setInspectedOnion] = useState<Onion>(JUDGE_PRESETS[0] as unknown as Onion);
   const [flashActive, setFlashActive] = useState<boolean>(false);
   const [activeGate, setActiveGate] = useState<1 | 2 | 3>(1);
@@ -60,11 +60,17 @@ export const ConveyorSimulator: React.FC<ConveyorSimulatorProps> = ({
   const [showVisionOverlay, setShowVisionOverlay] = useState<boolean>(true);
   const [activeChuteDrop, setActiveChuteDrop] = useState<1 | 2 | 3 | null>(null);
 
+  // Single Source of Truth for Physics Simulation
+  const itemsRef = useRef<ConveyorItem[]>([]);
   const nextIdRef = useRef<number>(101);
   const lastSpawnTimeRef = useRef<number>(Date.now());
   const requestAnimRef = useRef<number | null>(null);
-  const itemsRef = useRef<ConveyorItem[]>([]);
-  itemsRef.current = items;
+  const isRunningRef = useRef<boolean>(isRunning);
+  isRunningRef.current = isRunning;
+  const speedRef = useRef<number>(conveyorSpeed);
+  speedRef.current = conveyorSpeed;
+  const onNewSortedOnionRef = useRef(onNewSortedOnion);
+  onNewSortedOnionRef.current = onNewSortedOnion;
 
   // Function to spawn a specific or random onion onto conveyor
   const spawnOnion = useCallback((preset?: JudgePreset) => {
@@ -93,120 +99,107 @@ export const ConveyorSimulator: React.FC<ConveyorSimulatorProps> = ({
       onion = generateRandomSample(nextIdRef.current++);
     }
 
-    setItems(prev => [
-      ...prev,
-      {
-        onion,
-        progress: 0,
-        id: onion.id,
-        stage: 'APPROACHING',
-        inspected: false,
-        sorted: false,
-        rotation: Math.floor(Math.random() * 360)
-      }
-    ]);
+    const newItem: ConveyorItem = {
+      onion,
+      progress: 0,
+      id: onion.id,
+      stage: 'APPROACHING',
+      inspected: false,
+      sorted: false,
+      rotation: Math.floor(Math.random() * 360)
+    };
+
+    // Mutate physics list directly to prevent state overwrite race conditions
+    itemsRef.current.push(newItem);
+    setRenderItems([...itemsRef.current]);
   }, []);
 
-  // Spawn initial onion on mount
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      spawnOnion(JUDGE_PRESETS[0]);
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [spawnOnion]);
-
-  // Main animation frame loop for ultra-smooth 60fps conveyor movement
+  // Continuous animation loop for physics & 60FPS fluid motion
   useEffect(() => {
     let lastTimestamp = performance.now();
 
     const animate = (timestamp: number) => {
       const rawDelta = (timestamp - lastTimestamp) / 1000;
       lastTimestamp = timestamp;
-      // Clamp delta to avoid huge jumps if tab was unfocused
-      const delta = Math.min(rawDelta, 0.05);
+      const delta = Math.min(rawDelta, 0.05); // Cap delta to prevent teleporting
 
-      if (isRunning) {
+      if (isRunningRef.current) {
+        const currentSpeed = speedRef.current;
         const now = Date.now();
-        const spawnInterval = 3400 / conveyorSpeed;
+        const spawnInterval = 3200 / currentSpeed;
+
+        // Auto feed sample
         if (now - lastSpawnTimeRef.current > spawnInterval) {
           spawnOnion();
           lastSpawnTimeRef.current = now;
         }
 
-        const currentItems = itemsRef.current;
-        const updated: ConveyorItem[] = [];
-        const eventsToTrigger: Array<() => void> = [];
+        const items = itemsRef.current;
+        const keptItems: ConveyorItem[] = [];
 
-        for (const item of currentItems) {
-          // Progress advances at a consistent calibrated rate
-          const progressStep = 22 * conveyorSpeed * delta;
-          const newProgress = item.progress + progressStep;
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          const progressStep = 24 * currentSpeed * delta;
+          item.progress += progressStep;
+          item.rotation = (item.rotation + progressStep * 3) % 360;
 
-          let newInspected = item.inspected;
-          let newSorted = item.sorted;
-          let stage = item.stage;
-
-          // Inspection trigger at 44% progress (Camera Darkroom Station)
-          if (!item.inspected && newProgress >= 44) {
-            newInspected = true;
-            stage = 'INSPECTION';
+          // Inspection Station Trigger at 45% progress
+          if (!item.inspected && item.progress >= 45) {
+            item.inspected = true;
+            item.stage = 'INSPECTION';
             const onion = item.onion;
             const gate = onion.outputGrade === 'GOOD' ? 1 : onion.outputGrade === 'MEDIUM' ? 2 : 3;
             const angle = gate === 1 ? 45 : gate === 2 ? 0 : -45;
 
-            eventsToTrigger.push(() => {
-              setInspectedOnion(onion);
-              setFlashActive(true);
-              setActiveGate(gate);
-              setServoAngle(angle);
-              soundFx.playCameraTrigger();
-              soundFx.playActuator();
-              soundFx.playGradeTone(onion.outputGrade);
-              setTimeout(() => setFlashActive(false), 200);
-            });
+            setInspectedOnion(onion);
+            setFlashActive(true);
+            setActiveGate(gate);
+            setServoAngle(angle);
+            soundFx.playCameraTrigger();
+            soundFx.playActuator();
+            soundFx.playGradeTone(onion.outputGrade);
+            setTimeout(() => setFlashActive(false), 220);
           }
 
-          // Diversion / Bin chute trigger at 82% progress
-          if (!item.sorted && newProgress >= 82) {
-            newSorted = true;
-            stage = 'DIVERTING';
+          // Bin Sorting Drop Trigger at 80% progress
+          if (!item.sorted && item.progress >= 80) {
+            item.sorted = true;
+            item.stage = 'DIVERTING';
             const onion = item.onion;
             const gate = onion.outputGrade === 'GOOD' ? 1 : onion.outputGrade === 'MEDIUM' ? 2 : 3;
 
-            eventsToTrigger.push(() => {
-              onNewSortedOnion(onion);
-              setActiveChuteDrop(gate);
-              setTimeout(() => setActiveChuteDrop(null), 400);
-            });
+            onNewSortedOnionRef.current(onion);
+            setActiveChuteDrop(gate);
+            setTimeout(() => setActiveChuteDrop(null), 350);
           }
 
-          // Keep item until it completes the chute drop at 100%
-          if (newProgress < 100) {
-            updated.push({
-              ...item,
-              progress: newProgress,
-              inspected: newInspected,
-              sorted: newSorted,
-              stage: newProgress < 40 ? 'APPROACHING' : newProgress < 75 ? 'INSPECTION' : 'DIVERTING',
-              rotation: (item.rotation + progressStep * 3) % 360
-            });
+          // Keep item until it finishes falling into bin at 100%
+          if (item.progress < 100) {
+            keptItems.push(item);
           }
         }
 
-        setItems(updated);
-
-        // Execute side effects safely outside state updater
-        eventsToTrigger.forEach(fn => fn());
+        itemsRef.current = keptItems;
+        setRenderItems([...keptItems]);
       }
 
       requestAnimRef.current = requestAnimationFrame(animate);
     };
 
     requestAnimRef.current = requestAnimationFrame(animate);
+
+    // Initial spawn
+    const initTimer = setTimeout(() => {
+      if (itemsRef.current.length === 0) {
+        spawnOnion(JUDGE_PRESETS[0]);
+      }
+    }, 200);
+
     return () => {
+      clearTimeout(initTimer);
       if (requestAnimRef.current) cancelAnimationFrame(requestAnimRef.current);
     };
-  }, [isRunning, conveyorSpeed, spawnOnion, onNewSortedOnion]);
+  }, [spawnOnion]);
 
   // Handle Judge Preset Click
   const handleSelectPreset = (preset: JudgePreset) => {
@@ -228,33 +221,36 @@ export const ConveyorSimulator: React.FC<ConveyorSimulatorProps> = ({
 
   const activeOnion = inspectedOnion || (JUDGE_PRESETS[0] as unknown as Onion);
 
-  // Helper to calculate smooth 2D coordinates for the onion throughout its journey
-  const getOnionPosition = (item: ConveyorItem) => {
-    const p = item.progress;
+  // Position calculation for smooth 2D motion across the belt and into bins
+  const calculatePosition = (item: ConveyorItem) => {
+    const p = Math.min(100, Math.max(0, item.progress));
     const gate = item.onion.outputGrade === 'GOOD' ? 1 : item.onion.outputGrade === 'MEDIUM' ? 2 : 3;
 
     if (p <= 74) {
-      // Phase 1: Linear travel on horizontal conveyor (0% to 74%)
-      // Belt spans from 4% left to 74% left
-      const left = 4 + (p / 74) * 70;
-      const top = 50; // Centered in belt
-      const scale = 1;
-      const opacity = p < 5 ? p / 5 : 1;
-      return { left: `${left}%`, top: `${top}%`, scale, opacity };
+      // Phase 1: Horizontal travel on the belt (from 2% to 74%)
+      const left = 2 + (p / 74) * 72;
+      return {
+        left: `${left}%`,
+        top: '50%',
+        scale: 1,
+        opacity: p < 4 ? p / 4 : 1
+      };
     } else {
-      // Phase 2: Diverter deflection & drop into designated bin chute (74% to 100%)
-      const divertProgress = (p - 74) / 26; // 0.0 to 1.0
-
-      // Gate 1 (Good): Diverts towards Left Chute (Bin 1 ~ 22% X relative to sorter)
-      // Gate 2 (Medium): Drops down Center Chute (Bin 2 ~ 50% X)
-      // Gate 3 (Reject): Diverts towards Right Chute (Bin 3 ~ 78% X)
+      // Phase 2: Actuator chute drop (from 74% to 100%)
+      const dropProgress = (p - 74) / 26; // 0.0 to 1.0
       const startX = 74;
-      const targetX = gate === 1 ? 73 + divertProgress * 4 : gate === 2 ? 74 + divertProgress * 9 : 74 + divertProgress * 15;
-      const top = 50 + divertProgress * 44; // Drops smoothly downwards towards chute/bin
-      const scale = 1 - divertProgress * 0.25; // Slight perspective shrink as it enters bin
-      const opacity = divertProgress > 0.9 ? (1 - divertProgress) / 0.1 : 1;
+      // Chute endpoints corresponding to Bin 1, 2, 3
+      const targetX = gate === 1 ? 73 + dropProgress * 3 : gate === 2 ? 74 + dropProgress * 8 : 74 + dropProgress * 15;
+      const top = 50 + dropProgress * 42; // Drops down into bin
+      const scale = 1 - dropProgress * 0.3; // Perspective shrink
+      const opacity = dropProgress > 0.85 ? (1 - dropProgress) / 0.15 : 1;
 
-      return { left: `${targetX}%`, top: `${top}%`, scale, opacity };
+      return {
+        left: `${targetX}%`,
+        top: `${top}%`,
+        scale,
+        opacity
+      };
     }
   };
 
@@ -352,7 +348,7 @@ export const ConveyorSimulator: React.FC<ConveyorSimulatorProps> = ({
 
             {/* Visual Conveyor Track Canvas */}
             <div className="relative bg-[#060c08] rounded-2xl border-2 border-emerald-950 p-4 min-h-[340px] flex flex-col justify-between overflow-hidden shadow-2xl">
-              {/* Camera Inspection Chamber Structure (44% - 56% zone) */}
+              {/* Camera Inspection Chamber Structure (43% - 57% zone) */}
               <div className="absolute top-2 bottom-28 left-[42%] w-[18%] bg-[#102016]/95 border-2 border-cyan-500/60 rounded-xl z-20 pointer-events-none flex flex-col items-center justify-between p-2 shadow-[0_0_30px_rgba(6,182,212,0.3)]">
                 {/* Camera Housing & Status LED */}
                 <div className="w-full flex items-center justify-between text-[10px] font-mono text-cyan-300 px-1 border-b border-cyan-900/60 pb-1">
@@ -371,11 +367,11 @@ export const ConveyorSimulator: React.FC<ConveyorSimulatorProps> = ({
 
                 {/* Optical Breakbeam Sensor */}
                 <div className={`w-full text-[9px] font-mono text-center py-0.5 rounded border transition-colors ${
-                  items.some(i => i.stage === 'INSPECTION') 
+                  renderItems.some(i => i.stage === 'INSPECTION') 
                     ? 'bg-cyan-500 text-black font-black border-cyan-300 shadow-[0_0_10px_#06b6d4]' 
                     : 'bg-emerald-950/70 text-emerald-400 border-emerald-800/40'
                 }`}>
-                  IR BEAM: {items.some(i => i.stage === 'INSPECTION') ? '● CAPTURING' : 'READY'}
+                  IR BEAM: {renderItems.some(i => i.stage === 'INSPECTION') ? '● CAPTURING' : 'READY'}
                 </div>
               </div>
 
@@ -403,8 +399,8 @@ export const ConveyorSimulator: React.FC<ConveyorSimulatorProps> = ({
                   <div className="absolute inset-x-0 top-0 h-2 bg-gradient-to-b from-emerald-700/40 to-transparent border-b border-emerald-600/30 z-10"></div>
                   <div className="absolute inset-x-0 bottom-0 h-2 bg-gradient-to-t from-emerald-700/40 to-transparent border-t border-emerald-600/30 z-10"></div>
 
-                  {/* Actuator Diverter Gate Mechanism at 75% position */}
-                  <div className="absolute right-[22%] top-1/2 -translate-y-1/2 z-20 pointer-events-none flex items-center">
+                  {/* Actuator Diverter Gate Mechanism at 74% position */}
+                  <div className="absolute right-[24%] top-1/2 -translate-y-1/2 z-20 pointer-events-none flex items-center">
                     {/* Servo Arm with rotation */}
                     <div 
                       className="w-12 h-2.5 bg-gradient-to-r from-cyan-400 to-emerald-400 rounded-full shadow-[0_0_12px_rgba(6,182,212,0.8)] border border-white/60 transition-transform duration-200 origin-left"
@@ -415,8 +411,8 @@ export const ConveyorSimulator: React.FC<ConveyorSimulatorProps> = ({
                   </div>
 
                   {/* Render Moving Onions along the conveyor with smooth positioning */}
-                  {items.map(item => {
-                    const pos = getOnionPosition(item);
+                  {renderItems.map(item => {
+                    const pos = calculatePosition(item);
                     return (
                       <div
                         key={item.id}
@@ -431,7 +427,7 @@ export const ConveyorSimulator: React.FC<ConveyorSimulatorProps> = ({
                         onClick={() => setInspectedOnion(item.onion)}
                       >
                         {/* Onion physical visual bulb */}
-                        <div className={`w-14 h-14 rounded-full overflow-hidden border-2 flex items-center justify-center shadow-xl relative transition-transform hover:scale-110 bg-[#08110b] ${
+                        <div className={`w-14 h-14 rounded-full overflow-hidden border-2 flex items-center justify-center shadow-xl relative transition-transform hover:scale-110 bg-[#5c1c2b] ${
                           item.onion.outputGrade === 'GOOD' ? 'border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.5)]' :
                           item.onion.outputGrade === 'MEDIUM' ? 'border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.5)]' :
                           'border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.5)]'
@@ -441,6 +437,9 @@ export const ConveyorSimulator: React.FC<ConveyorSimulatorProps> = ({
                             alt="Onion" 
                             style={{ transform: `rotate(${item.rotation}deg)` }}
                             className="w-full h-full object-cover transition-transform" 
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).src = '/dataset/healthy_red.jpg';
+                            }}
                           />
                           {item.onion.condition === 'sprouted' && (
                             <span className="absolute -top-1 -right-1 text-xs bg-black/90 rounded-full px-1 border border-emerald-400" title="Sprouted">🌱</span>
